@@ -1,25 +1,16 @@
 import pyttsx3
+import threading
+import queue
 
 def speak(text, speed=160):
     engine = pyttsx3.init()
 
-    # Set Indian female voice if installed
-    voices = engine.getProperty('voices')
-    selected = False
-    for v in voices:
-        if "en-in" in v.id.lower() or "neerja" in v.id.lower():
-            engine.setProperty('voice', v.id)
-            selected = True
+    for v in engine.getProperty("voices"):
+        if "zira" in v.id.lower() or "female" in v.id.lower():
+            engine.setProperty("voice", v.id)
             break
 
-    # If Indian voice not found, fallback to any female voice
-    if not selected:
-        for v in voices:
-            if "female" in v.id.lower() or "zira" in v.id.lower():
-                engine.setProperty('voice', v.id)
-                break
-
-    engine.setProperty('rate', speed)
+    engine.setProperty("rate", speed)
     engine.say(text)
     engine.runAndWait()
     engine.stop()

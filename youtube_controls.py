@@ -3,10 +3,13 @@ import time
 import pygetwindow as gw
 import webbrowser
 import pywhatkit
-
+import subprocess
+import os
 # -------------------------------
 #  KEYWORD GROUPS
 # -------------------------------
+
+PLAY_SONG_PREFIX = "play"
 
 PAUSE_KEYWORDS = [
     "pause", "pause it", "stop", "stop it", 
@@ -20,7 +23,7 @@ PLAY_KEYWORDS = [
 ]
 
 REWIND_KEYWORDS = [
-    "rewind", "go back", "back 10 seconds", 
+    "rewind", "back 10 seconds", 
     "back little", "rewind a bit"
 ]
 
@@ -29,145 +32,172 @@ FORWARD_KEYWORDS = [
     "go forward", "forward 10 seconds"
 ]
 
-VOLUME_UP_KEYWORDS = [
-    "volume up", "increase volume", "louder", 
-    "sound up", "increase sound"
-]
-
-VOLUME_DOWN_KEYWORDS = [
-    "volume down", "decrease volume", "lower volume", 
-    "quiet", "reduce sound"
-]
-
 NEXT_VIDEO_KEYWORDS = [
     "next video", "skip video", "play next", "next", "play next video", "play next song"
 ]
 
 PREVIOUS_VIDEO_KEYWORDS = [
-    "previous video", "last video", "go back video", "previous"
+    "previous video", "last video", "go back video", 
 ]
-
-FULLSCREEN_KEYWORDS = [
-    "fullscreen", "full screen", "maximize video"
-]
-
-EXIT_FULLSCREEN_KEYWORDS = [
-    "exit full screen", "minimize video", "small screen"
-]
-
-CLOSE_TAB_KEYWORDS = [
-    "close tab", "close this", "close it", 
-    "exit tab", "close youtube", "stop youtube", "close the song"
-]
-
 
 # -------------------------------
 #  CONTROL FUNCTIONS
 # -------------------------------
+def get_active_window():
+    try:
+        return gw.getActiveWindow()
+    except:
+        return None
+
+def activate_youtube_tab():
+    """
+    Ensure Chrome is active, then bring any YouTube tab to front.
+    Returns True if successful.
+    """
+
+    # STEP 0 — Ensure Chrome window is active
+    if not activate_chrome():
+        return False
+
+    time.sleep(0.2)
+
+    # STEP 1 — Try to activate existing YouTube tab
+    for win in gw.getWindowsWithTitle("YouTube"):
+        try:
+            if win.isMinimized:
+                win.restore()
+
+            win.activate()
+            time.sleep(0.3)
+
+            active = gw.getActiveWindow()
+            if active and "youtube" in active.title.lower():
+                return True
+        except:
+            pass
+
+    return False
+
+def restore_window(win):
+    try:
+        if win:
+            win.activate()
+    except:
+        pass
+
+
+
+
+def play_song_command(command, speak, play_song_in_same_tab):
+    song = (
+        command.replace(PLAY_SONG_PREFIX, "")
+        .replace("on youtube", "")
+        .strip()
+    )
+
+    if not song:
+        return
+
+    speak(f"Playing {song}")
+    play_song_in_same_tab(song)
 
 def pause_video():
-    """Pauses or plays the YouTube video."""
-    time.sleep(0.2)
-    pyautogui.press("k")
+    prev = get_active_window()
 
+    if activate_chrome() and switch_to_youtube_tab():
+        time.sleep(0.2)
+        pyautogui.press("k")
+
+    time.sleep(0.2)
+    restore_window(prev)
 
 def play_video():
-    """Resumes or plays the video (same as pause toggle)."""
-    time.sleep(0.2)
-    pyautogui.press("k")
+    prev = get_active_window()
 
+    if activate_chrome() and switch_to_youtube_tab():
+        time.sleep(0.2)
+        pyautogui.press("k")
+
+    time.sleep(0.2)
+    restore_window(prev)
 
 def rewind_video():
-    """Rewinds 10 seconds."""
-    time.sleep(0.2)
-    pyautogui.press("j")
+    prev = get_active_window()
 
+    if activate_chrome() and switch_to_youtube_tab():
+        time.sleep(0.2)
+        pyautogui.press("j")
+
+    time.sleep(0.2)
+    restore_window(prev)
 
 def forward_video():
-    """Skips forward 10 seconds."""
+    prev = get_active_window()
+
+    if activate_chrome() and switch_to_youtube_tab():
+        time.sleep(0.2)
+        pyautogui.press("l")
+
     time.sleep(0.2)
-    pyautogui.press("l")
-
-
-def volume_up():
-    """Increases the volume."""
-    time.sleep(0.2)
-    pyautogui.press("up")
-
-
-def volume_down():
-    """Decreases the volume."""
-    time.sleep(0.2)
-    pyautogui.press("down")
-
+    restore_window(prev)
 
 def next_video():
-    """Plays the next video."""
-    time.sleep(0.2)
-    pyautogui.hotkey("shift", "n")
+    prev = get_active_window()
 
+    if activate_chrome() and switch_to_youtube_tab():
+        time.sleep(0.2)
+        pyautogui.hotkey("shift", "n")
+
+    time.sleep(0.2)
+    restore_window(prev)
 
 def previous_video():
-    """Plays the previous video."""
+    prev = get_active_window()
+
+    if activate_chrome() and switch_to_youtube_tab():
+        time.sleep(0.2)
+        pyautogui.hotkey("shift", "p")
+
     time.sleep(0.2)
-    pyautogui.hotkey("shift", "p")
-
-
-def fullscreen():
-    """Enters fullscreen mode."""
-    time.sleep(0.2)
-    pyautogui.press("f")
-
-
-def exit_fullscreen():
-    """Exits fullscreen mode."""
-    time.sleep(0.2)
-    pyautogui.press("f")  # same key toggles fullscreen
-
-
-def close_tab():
-    """Closes the current browser tab."""
-    time.sleep(0.2)
-    pyautogui.hotkey("ctrl", "w")
+    restore_window(prev)
 
 
 def activate_chrome():
-    """Safer Chrome activation without Windows 288 error."""
-    windows = gw.getAllTitles()
+    """Activate Chrome safely and maximize only if needed (no flicker)."""
 
-    for w in windows:
-        if "chrome" in w.lower():
+    try:
+        active = gw.getActiveWindow()
+        if active and "chrome" in active.title.lower():
+            # Chrome already active → just ensure maximized
             try:
-                win = gw.getWindowsWithTitle(w)[0]
+                if not active.isMaximized:
+                    active.maximize()
+            except:
+                pass
+            return True
+    except:
+        pass
 
-                # Restore if minimized
-                try:
-                    win.restore()
-                except:
-                    pass
-
+    for win in gw.getWindowsWithTitle("Chrome"):
+        try:
+            # Restore only if minimized
+            if win.isMinimized:
+                win.restore()
                 time.sleep(0.2)
 
-                # Try to activate (Windows sometimes blocks it)
-                try:
-                    win.activate()
-                except:
-                    pass
+            win.activate()
+            time.sleep(0.2)
 
-                time.sleep(0.3)
-
-                # Maximize if needed
-                try:
+            # Maximize ONLY if not already maximized
+            try:
+                if not win.isMaximized:
                     win.maximize()
-                except:
-                    pass
+            except:
+                pass
 
-                time.sleep(0.3)
-                return True
-
-            except Exception as e:
-                print("Chrome activation error:", e)
-                return False
+            return True
+        except:
+            pass
 
     return False
 
@@ -178,85 +208,79 @@ def chrome_is_active():
     except:
         return False
 
-
 def switch_to_youtube_tab():
+    """
+    Uses AutoHotkey to switch to an existing YouTube tab.
+    Returns True if successful, False otherwise.
+    """
 
-    if not chrome_is_active():
-        return False
-
-    """Switch Chrome to a YouTube tab safely (no crashes)."""
-    chrome_windows = gw.getWindowsWithTitle("Chrome")
-    if not chrome_windows:
-        return False
-
-    win = chrome_windows[0]
-
-    # NEVER let activate crash
-    try:
-        if win.isMinimized:
-            win.restore()
-    except:
-        pass
-
-    time.sleep(0.2)
+    ahk_path = r"C:\Program Files\AutoHotkey\AutoHotkey.exe"
+    ahk_script = os.path.join(os.getcwd(), "switch_to_youtube_tab.ahk")
 
     try:
-        win.activate()
-    except:
-        pass   # <- THIS was missing
-
-    time.sleep(0.3)
-
-    # Use keyboard navigation instead of forcing focus
-    pyautogui.hotkey("ctrl", "shift", "a")
-    time.sleep(0.5)
-
-    pyautogui.typewrite("youtube", interval=0.05)
-    time.sleep(0.4)
-
-    pyautogui.press("enter")
-    time.sleep(0.8)
-
-    return True
+        result = subprocess.run(
+            [ahk_path, ahk_script],
+            timeout=12
+        )
+        return result.returncode == 0
+    except Exception as e:
+        print("AHK tab switch failed:", e)
+        return False
 
 def play_song_in_same_tab(song):
-    """Search and play a song on YouTube in the same tab."""
-
     url = f"https://www.youtube.com/results?search_query={song.replace(' ', '+')}"
 
     # STEP 1 — Ensure Chrome exists
     if not activate_chrome():
         webbrowser.open("https://www.youtube.com")
-        time.sleep(3)
+        time.sleep(4)
         activate_chrome()
 
-    time.sleep(0.5)
+    time.sleep(0.4)
 
-    # STEP 2 — Switch to YouTube tab
-    switch_to_youtube_tab()
-    time.sleep(0.3)
+    # STEP 2 — Try switching to existing YouTube tab
+    youtube_found = switch_to_youtube_tab()
+    time.sleep(0.4)
 
-    # STEP 3 — Check Chrome focus
+    # STEP 3 — If NO YouTube tab → open NEW tab AND load YouTube
+    if not youtube_found:
+        pyautogui.hotkey("ctrl", "t")
+        time.sleep(0.3)
+        # pyautogui.typewrite("https://www.youtube.com", interval=0.02)
+        pyautogui.press("enter")
+
+        # wait for YouTube to actually load
+        start = time.time()
+        while time.time() - start < 10:
+            try:
+                active = gw.getActiveWindow()
+                if active and "youtube" in active.title.lower():
+                    break
+            except:
+                pass
+            time.sleep(0.4)
+
+    # STEP 4 — FINAL safety check
     try:
         active = gw.getActiveWindow()
-        chrome_focused = active and "chrome" in active.title.lower()
+        if not active or "chrome" not in active.title.lower():
+            webbrowser.open(url)
+            return
     except:
-        chrome_focused = False
-
-    if not chrome_focused:
         webbrowser.open(url)
         return
 
-    # STEP 4 — Open search in SAME tab
+    # STEP 5 — Search INSIDE YouTube tab
     pyautogui.hotkey("ctrl", "l")
     time.sleep(0.2)
     pyautogui.typewrite(url, interval=0.02)
     pyautogui.press("enter")
 
-    # STEP 5 — Wait for results
+    # STEP 6 — Wait for results
     time.sleep(3)
 
-    # STEP 6 — Click first video (UI based, same tab)
+    # STEP 7 — Click first video
     screen_w, screen_h = pyautogui.size()
-    pyautogui.click(screen_w // 2, int(screen_h * 0.42))
-
+    x = int(screen_w * 0.35)   # left-shifted
+    y = int(screen_h * 0.45)
+    pyautogui.click(x, y)
